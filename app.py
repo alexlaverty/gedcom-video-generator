@@ -51,12 +51,15 @@ def get_images(element):
                     for f in e.get_child_elements():
                         if f.get_tag() == "FILE":
                             #print(f.get_value())
-                            for s in f.get_child_elements():
-                                s_val = ""
-                                if s.get_tag() == "TITL":
-                                    #print(s.get_value())
-                                    s_val = s.get_value()
-                            files.append({'path':f.get_value(),'description':s_val})
+                            for t in f.get_child_elements():
+                                t_val = ""
+                                if t.get_tag() == "TITL":
+                                    t_val = t.get_value()
+                                    for c in t.get_child_elements():
+                                        if c.get_tag() == "CONC":
+                                            t_val += c.get_value()
+                                    
+                            files.append({'path':f.get_value(),'description':t_val})
     return files
 
 
@@ -82,20 +85,6 @@ def generate_story(element):
     if birth_place:
         text += f", {birth_place}"
     text += ".\n"
-
-    parents = gedcom_parser.get_parents(element)
-    father = ""
-    mother = ""
-    for parent in parents:
-        if parent.get_gender() == "M":
-            father = " ".join(parent.get_name())
-        if parent.get_gender() == "F":
-            mother = " ".join(parent.get_name())
-    if parents:
-        if father:
-            text += f"{first}'s father is {father}.\n"
-        if mother:
-            text += f"{first}'s mother is {mother}.\n"
 
     #spouse = get_spouse(element)
 
@@ -134,7 +123,7 @@ def get_clip(name, element, image, text):
 
     clip_text = TextClip(text, 
                         size=(video_width/2 - 200,None), 
-                        fontsize = 30,
+                        fontsize = 35,
                         color="#3D2918",
                         bg_color="#D4C1A6", 
                         align='center',
@@ -143,7 +132,7 @@ def get_clip(name, element, image, text):
                         .set_duration(duration)\
                         .set_position((video_width/2 + 100,"center"))\
                         .set_audio(title_audio)\
-                        .margin(top=5, left=5, right=5, bottom=5, color=(178, 144, 103))     
+                        .margin(top=2, left=2, right=2, bottom=2, color=(178, 144, 103))     
 
     scene_clips.append(clip_text)
     scene = CompositeVideoClip(scene_clips)
@@ -163,8 +152,6 @@ def get_individual_clips(element):
     for count, image in enumerate(image_list):
         iclips.append(get_clip(str(count), element, image['path'], image['description']))
 
-    #for image in image_list:
-        
     return iclips
 
 
