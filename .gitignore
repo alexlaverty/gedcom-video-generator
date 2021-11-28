@@ -1,0 +1,6 @@
+config.py
+assets/
+debug.log
+__pycache__/
+laverty.ged
+final.mp4
