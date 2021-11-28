@@ -8,8 +8,8 @@ clips = []
 starting_id = "@I0000@"
 video_width = 1920 
 video_height = 1080
-pause = 2
-
+pause = 1
+margin = 40
 # Path to your `.ged` file
 file_path = 'example.ged'
 
@@ -35,22 +35,31 @@ def get_file_list(element):
     element_children = element.get_child_elements()
     for element in element_children:
         if element.get_tag() == "OBJE":
-            #print(element.get_value())
+            print(element)
             files.append(get_obje_path(element.get_value()))
     return files
 
-def process(element):
-    (first, last) = element.get_name()
-    print(first + " " + last)
-    
-    person_clip = generate(element)
-    clips.append(person_clip)
+def get_images(element):
+    files = []
+    print(" ".join(element.get_name()))
+    element_children = element.get_child_elements()
+    for element in element_children:
+        if element.get_tag() == "OBJE":
+            for e in root_child_elements:
+            # print(e)
+                if e.get_pointer() == element.get_value():
+                    for f in e.get_child_elements():
+                        if f.get_tag() == "FILE":
+                            #print(f.get_value())
+                            for s in f.get_child_elements():
+                                s_val = ""
+                                if s.get_tag() == "TITL":
+                                    #print(s.get_value())
+                                    s_val = s.get_value()
+                            files.append({'path':f.get_value(),'description':s_val})
+    return files
 
 
-    parents = gedcom_parser.get_parents(element)
-    for parent in parents:
-        if parent.get_gender() == "M":
-            process(parent)
 
 
 
@@ -65,10 +74,11 @@ def generate_story(element):
     fullname = " ".join(element.get_name())
 
     birth_data = element.get_birth_data()
+    birth_year = element.get_birth_year()
     birth_date = birth_data[0] if 0 < len(birth_data) else None
     birth_place = birth_data[1] if 1 < len(birth_data) else None
     if birth_date:
-        text += f" was born on {birth_date}"
+        text += f" was born in {birth_year}"
     if birth_place:
         text += f", {birth_place}"
     text += ".\n"
@@ -87,63 +97,104 @@ def generate_story(element):
         if mother:
             text += f"{first}'s mother is {mother}.\n"
 
+    #spouse = get_spouse(element)
+
+
     return text
 
-def generate(element):
-    clips = []
-    title_audio_path = str(Path("assets", element.get_pointer().replace("@","") + ".mp3"))
-    narration_text = generate_story(element)
-    speech.create_audio(title_audio_path, narration_text)
+def get_clip(name, element, image, text):
+    print("image")
+    print(image)
+
+    title_audio_path = str(Path("assets", element.get_pointer().replace("@","") + "_" + name + ".mp3"))
+    speech.create_audio(title_audio_path, text)
     title_audio = AudioFileClip(title_audio_path).volumex(2)
     duration = title_audio.duration + pause
-    file_list = get_file_list(element)
-    (firstname, surname) = element.get_name()
-    
+    scene_clips = []
+
     clip_background = TextClip("", size=(video_width,video_height), 
                             bg_color="white", 
                             method="caption")\
                             .set_duration(duration)
-    clips.append(clip_background)
+    scene_clips.append(clip_background)
 
-    if file_list:
-        clip_photo = ImageClip(file_list[0])\
-                                .set_duration(duration)\
-                                .set_position(("left","center"))\
-                                .resize(width=500,height=None)                             
-        clips.append(clip_photo)
+    background_file = str(Path("assets", "background01.jpg"))
+    clip_background_photo = ImageClip(background_file)\
+                            .set_duration(duration)\
+                            .set_position(("center","center"))\
+                            .resize(width=video_width)                             
+    scene_clips.append(clip_background_photo)
 
-    clip_name = TextClip(f"{firstname} {surname}", 
-                        size=(600,None), 
+    clip_photo = ImageClip(image)\
+                            .set_duration(duration)\
+                            .set_position((0 + margin,"center"))\
+                            .resize(width=video_width/2 - margin)
+    clip_photo_with_borders = clip_photo.margin(top=20, left=20, right=20, bottom=80, color=(255, 255, 255))                           
+    scene_clips.append(clip_photo_with_borders)
+
+    clip_text = TextClip(text, 
+                        size=(video_width/2 - 200,None), 
                         fontsize = 30,
-                        bg_color="grey", 
-                        align='West',
+                        color="#3D2918",
+                        bg_color="#D4C1A6", 
+                        align='center',
+                        font='Georgia',
                         method="caption")\
                         .set_duration(duration)\
-                        .set_position(("left", 50))\
-                        .set_audio(title_audio)
-    clips.append(clip_name)
+                        .set_position((video_width/2 + 100,"center"))\
+                        .set_audio(title_audio)\
+                        .margin(top=5, left=5, right=5, bottom=5, color=(178, 144, 103))     
 
-    clip_text = TextClip(narration_text, 
-                        size=(800,None), 
-                        fontsize = 30,
-                        bg_color="grey", 
-                        align='West',
-                        method="caption")\
-                        .set_duration(duration)\
-                        .set_position(("right","center"))\
-                        .set_audio(title_audio)
-    clips.append(clip_text)
+    scene_clips.append(clip_text)
+    scene = CompositeVideoClip(scene_clips)
+    return scene
 
-    final_video = CompositeVideoClip(clips)
-    return final_video
+def get_individual_clips(element):
+    iclips = []
+    image_list = get_images(element)
 
+    image = image_list[0]['path']
+    text = generate_story(element)
+
+    default_story_clip = get_clip("default",element, image, text)
+    iclips.append(default_story_clip)
+    del image_list[0]
+
+    for count, image in enumerate(image_list):
+        iclips.append(get_clip(str(count), element, image['path'], image['description']))
+
+    #for image in image_list:
+        
+    return iclips
+
+
+def process_individual(element):
+    (first, last) = element.get_name()
+    print(first + " " + last)
+  
+    individual_clips = get_individual_clips(element)
+    for individual_clip in individual_clips:
+        clips.append(individual_clip)
+
+    parents = gedcom_parser.get_parents(element)
+    for parent in parents:
+        if parent.get_gender() == "M":
+            print("processing father")
+            process_individual(parent)
 
 # Iterate through all root child elements
 for element in root_child_elements:
     if isinstance(element, IndividualElement):
         if starting_id == element.get_pointer():
-            process(element)
+            process_individual(element)
 
 final_clip = concatenate_videoclips(clips)
 video_final_path = str(Path("final.mp4"))
-final_clip.write_videofile(video_final_path, fps=5)
+
+musicfile = AudioFileClip("music.mp3")
+musicclip = afx.audio_loop(musicfile, duration=final_clip.duration)
+#final_video = final_clip.set_audio(audioclip)
+final_audio = CompositeAudioClip([final_clip.audio.volumex(1), musicclip.volumex(0.6)])
+final_video = final_clip.set_audio(final_audio)
+
+final_video.write_videofile(video_final_path, fps=5)
