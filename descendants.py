@@ -6,6 +6,7 @@ import speech
 from pathlib import Path
 import logging 
 import gedcom.tags
+import video
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -16,7 +17,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ])
 
-file_path = 'C:\\Users\\laverty\\Documents\\gedcom-video-laverty\\laverty_full.ged'
+file_path = 'C:\\Users\\laverty\\Documents\\gedcom-video-laverty\\laverty.ged'
 family_list = []
 gedcom_parser = Parser()
 gedcom_parser.parse_file(file_path)
@@ -135,31 +136,56 @@ def get_descendant_families(family):
             family_list.extend(get_descendant_families(f))
     return family_list
 
-# def process_families(family):
-#     family_list = []
-#     family_list.append(family)
 
-#     father = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_HUSBAND)
-#     mother = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_WIFE)
-#     children = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_CHILD)
-#     father_fullname = " ".join(father[0].get_name())
-#     mother_fullname = " ".join(mother[0].get_name())
+def get_individual_gallery_files(element):
+    files = []
+    element_children = element.get_child_elements()
+    for element in element_children:
+        if element.get_tag() == "OBJE":
+            for e in root_child_elements:
+                if e.get_pointer() == element.get_value():
+                    for f in e.get_child_elements():
+                        if f.get_tag() == "FILE":
+                            for t in f.get_child_elements():
+                                t_val = ""
+                                if t.get_tag() == "TITL":
+                                    t_val = t.get_value()
+                                    for c in t.get_child_elements():
+                                        if c.get_tag() == "CONC":
+                                            t_val += c.get_value()
+                                    
+                            files.append({'path':f.get_value(),'description':t_val})
+    return files
 
-#     print(f"The family of {father_fullname} and {mother_fullname}")
-#     for child in children:
-#         print("child : " + " ".join(child.get_name()) )
-#         family_spouse = gedcom_parser.get_families(child, gedcom.tags.GEDCOM_TAG_FAMILY_SPOUSE)
-#         if family_spouse:
-#             print("Skipping Clip")
-#         else:
-#             print("Create Clip")
-#         for f in family_spouse:
-#             family_list.extend(process_families(f))
-#     return family_list
+def get_individual_clips(individual):
+    individual_clips = []
+
+    individual_gallery_files = get_individual_gallery_files(individual)
+    individual_profile_photo = None
+    individual_fullname = " ".join(individual.get_name())
+    individual_shortname = individual_fullname.split(" ")[0]
+
+    if individual_gallery_files:
+        individual_profile_photo = individual_gallery_files[0]['path']
+
+    individual_default_text = f"{individual_fullname}\n "
+
+    individual_birth_year = individual.get_birth_year()
+
+    if individual_birth_year != -1:
+        individual_default_text += f"was born in {individual_birth_year}\n "
+
+    individual_default_clip = video.get_clip(f"{individual.get_pointer()}_default", individual_default_text, image=individual_profile_photo)
+
+    individual_clips.append(individual_default_clip)
+
+    return individual_clips
+
 
 def get_family_clips(family):
     print("------------------------")
     #print(family)
+    family_clips = []
     father = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_HUSBAND)
     mother = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_WIFE)
     children = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_CHILD)
@@ -169,34 +195,59 @@ def get_family_clips(family):
     father_shortname = father_fullname.split(" ")[0]
     mother_shortname = mother_fullname.split(" ")[0]
 
-    print(f"The family of {father_fullname} and {mother_fullname}")
+    family_intro_text = f"{father_fullname}\n and \n{mother_fullname}"
+    print(family_intro_text)
+    family_intro = video.get_family_intro_clip("family_intro", family_intro_text, image=None)
+    family_clips.append(family_intro)
 
-    father_birth_year = father[0].get_birth_year()
-    if father_birth_year != -1:
-        print(father_shortname + " was born in " + str(father[0].get_birth_year()) )
+    father_clip = get_individual_clips(father[0])
+    family_clips.extend(father_clip)
 
-    mother_birth_year = mother[0].get_birth_year()
-    if mother_birth_year != -1:
-        print(mother_shortname + " was born in " + str(mother[0].get_birth_year()) )
+    mother_clip = get_individual_clips(mother[0])
+    family_clips.extend(mother_clip)
 
     number_of_children = len(children)
     if number_of_children > 0:
-        print(f"Together they had a total of {number_of_children} children.")
-    for child in children:
-        print("* " + child.get_name()[0].split(" ")[0] )
+        child_word = "children"
+        if number_of_children == 1:
+            child_word = "child"
+        children_text = f"Together they had {number_of_children} {child_word}.\n"
 
-    father_death_year = father[0].get_death_year()
-    if father_death_year != -1:
-        print(father_shortname + " passed away in " + str(father_death_year) )
+        for child in children:
+            children_text += child.get_name()[0].split(" ")[0] + ", "
+        children_text = children_text.rstrip(', ')
 
-    mother_death_year = mother[0].get_death_year()
-    if mother_death_year != -1:
-        print(mother_shortname + " passed away in " + str(mother_death_year) )
+        children_clip = video.get_clip(f"{father_fullname}_children", children_text, image=None)
+        family_clips.append(children_clip)
+
+    father_gallery_files = get_individual_gallery_files(father[0])
+    if len(father_gallery_files) > 1:
+        del father_gallery_files[0]
+        for count, father_gallery_file in enumerate(father_gallery_files):
+            father_gallery_clip = video.get_clip(father_fullname + str(count), father_gallery_file['description'], image=father_gallery_file['path'])
+            family_clips.append(father_gallery_clip)
+
+    mother_gallery_files = get_individual_gallery_files(mother[0])
+    if len(mother_gallery_files) > 1:
+        del mother_gallery_files[0]
+        for count, mother_gallery_file in enumerate(mother_gallery_files):
+            mother_gallery_clip = video.get_clip(mother_fullname + str(count), mother_gallery_file['description'], image=mother_gallery_file['path'])
+            family_clips.append(mother_gallery_clip)
+
+    # father_death_year = father[0].get_death_year()
+    # if father_death_year != -1:
+    #     print(father_shortname + " passed away in " + str(father_death_year) )
+
+    # mother_death_year = mother[0].get_death_year()
+    # if mother_death_year != -1:
+    #     print(mother_shortname + " passed away in " + str(mother_death_year) )
+
+    return family_clips
 
 if __name__ == "__main__":
-
-    #starting_id = "@I0007@"
-    starting_id = "@I282315998674@"
+    clips = []
+    starting_id = "@I0007@"
+    #starting_id = "@I282315998674@"
     #starting_id = "@I282315998663@"
     starting_family = "@F0002@"
 
@@ -210,5 +261,20 @@ if __name__ == "__main__":
     descendant_families = get_descendant_families(starting_families[0])
 
     for family in descendant_families:
-        get_family_clips(family)
+        family_clips = get_family_clips(family)
+        for family_clip in family_clips:
+            clips.append(family_clip)
 
+    if clips:
+        final_clip = concatenate_videoclips(clips)
+        video_final_path = str(Path("descendants.mp4"))
+
+        musicfile = AudioFileClip("music.mp3")
+        musicclip = afx.audio_loop(musicfile, duration=final_clip.duration)
+        #final_video = final_clip.set_audio(audioclip)
+        final_audio = CompositeAudioClip([final_clip.audio.volumex(1), musicclip.volumex(0.6)])
+        final_video = final_clip.set_audio(final_audio)
+
+        final_video.write_videofile(video_final_path, fps=5)
+    else:
+        print("No Clips Generated!")

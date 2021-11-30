@@ -12,7 +12,8 @@ logging.basicConfig(
     ])
 
 def process_speech_text(text):
-    text = text.replace(" Laverty ", " Lav Verty ")
+    #text = text.replace(" Laverty ", " Lav Verty ")
+    text = text.replace("&", "and")
     return text
 
 def create_audio(path, text):
@@ -34,7 +35,7 @@ def create_audio(path, text):
             OutputFormat='mp3', 
             Text=polly_text,
             TextType='ssml',
-            VoiceId='Matthew'
+            VoiceId='Olivia'
         )
 
     file = open(path, 'wb')
