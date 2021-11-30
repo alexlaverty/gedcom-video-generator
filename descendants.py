@@ -213,9 +213,16 @@ def get_family_clips(family):
             child_word = "child"
         children_text = f"Together they had {number_of_children} {child_word}.\n"
 
-        for child in children:
-            children_text += child.get_name()[0].split(" ")[0] + ", "
-        children_text = children_text.rstrip(', ')
+        if len(children) == 2:
+            for child in children:
+                children_text += child.get_name()[0].split(" ")[0]  + " and "
+            if children_text[-5:] == " and ":
+                children_text = children_text[:-5]
+        else:
+            for child in children:
+                children_text += child.get_name()[0].split(" ")[0]  + ", "
+            children_text = children_text.rstrip(', ')
+        children_text = children_text + "."
 
         children_clip = video.get_clip(f"{father_fullname}_children", children_text, image=None)
         family_clips.append(children_clip)
