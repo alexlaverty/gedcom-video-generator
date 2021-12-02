@@ -39,32 +39,6 @@ def get_family_from_individual(individual):
     return gedcom_parser.get_families(individual)
 
 
-# starting_families = gedcom_parser.get_families(starting_individual)
-
-# if starting_families:
-#     for family in starting_families:
-#         family_list.append(family)
-#         #starting_family_elements = family.get_child_elements()
-
-
-# def get_descendant_families(individual):
-#     descendant_families = []
-#     starting_family = get_family_from_individual(individual)
-#     descendant_families.append(starting_family)
-#     children_families = get_children_families(starting_family)
-
-#     return descendant_families
-
-# for e in starting_family_elements:
-#     #print(e.get_tag())
-#     family_element = get_individual_from_id( e.get_value() )
-#     if family_element:
-#         print(family_element.get_name())
-#         if e.get_tag() == "CHIL":
-#             person_families = gedcom_parser.get_families(family_element)
-#             for person_family in person_families:
-#                 family_list.append(person_family)
-
 def get_children(individual):
     """Return elements corresponding to parents of an individual
     Optional parent_type. Default "ALL" returns all parents. "NAT" can be
@@ -80,7 +54,7 @@ def get_children(individual):
     for family in families:
         children += gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_CHILD)
         # for family_member in family_members:
-        #     print(family_member.get_tag())
+        #     logging.info(family_member.get_tag())
 
     return children
 
@@ -99,21 +73,10 @@ def get_descendants( individual):
 
     for child in children:
         descendants.extend(get_descendants(child))
-        #print(descendants)
+        #logging.info(descendants)
 
     return descendants
 
-# def get_descendant_families(family):
-#     families = []
-
-#     children = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_CHILD)
-
-#     for child in children:
-#         #print(child)
-#         family_spouse = gedcom_parser.get_families(child, gedcom.tags.GEDCOM_TAG_FAMILY_SPOUSE)
-#         families.extend(family_spouse)
-
-#     return families
 
 def get_descendant_families(family):
     family_list = []
@@ -122,16 +85,16 @@ def get_descendant_families(family):
     # mother = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_WIFE)
     children = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_CHILD)
     # if father:
-    #     print("father : " + " ".join(father[0].get_name()) )
+    #     logging.info("father : " + " ".join(father[0].get_name()) )
     # if mother:
-    #     print("mother : " + " ".join(mother[0].get_name()) )
+    #     logging.info("mother : " + " ".join(mother[0].get_name()) )
     for child in children:
-        #print("child : " + " ".join(child.get_name()) )
+        #logging.info("child : " + " ".join(child.get_name()) )
         family_spouse = gedcom_parser.get_families(child, gedcom.tags.GEDCOM_TAG_FAMILY_SPOUSE)
         # if family_spouse:
-        #     print("Skipping Clip")
+        #     logging.info("Skipping Clip")
         # else:
-        #     print("Create Clip")
+        #     logging.info("Create Clip")
         for f in family_spouse:
             family_list.extend(get_descendant_families(f))
     return family_list
@@ -182,9 +145,10 @@ def get_individual_clips(individual):
     return individual_clips
 
 
+
 def get_family_clips(family):
-    print("------------------------")
-    #print(family)
+    logging.info("------------------------")
+    #logging.info(family)
     family_clips = []
     father = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_HUSBAND)
     mother = gedcom_parser.get_family_members(family, gedcom.tags.GEDCOM_TAG_WIFE)
@@ -196,7 +160,7 @@ def get_family_clips(family):
     mother_shortname = mother_fullname.split(" ")[0]
 
     family_intro_text = f"{father_fullname}\n and \n{mother_fullname}"
-    print(family_intro_text)
+    logging.info(family_intro_text)
     family_intro = video.get_family_intro_clip("family_intro", family_intro_text, image=None)
     family_clips.append(family_intro)
 
@@ -224,7 +188,11 @@ def get_family_clips(family):
             children_text = children_text.rstrip(', ')
         children_text = children_text + "."
 
-        children_clip = video.get_clip(f"{father_fullname}_children", children_text, image=None)
+        family_photos = get_individual_gallery_files(family)
+        family_photo = None
+        if family_photos:
+            family_photo = family_photos[0]['path']
+        children_clip = video.get_clip(f"{father_fullname}_children", children_text, image=family_photo)
         family_clips.append(children_clip)
 
     father_gallery_files = get_individual_gallery_files(father[0])
@@ -243,11 +211,11 @@ def get_family_clips(family):
 
     # father_death_year = father[0].get_death_year()
     # if father_death_year != -1:
-    #     print(father_shortname + " passed away in " + str(father_death_year) )
+    #     logging.info(father_shortname + " passed away in " + str(father_death_year) )
 
     # mother_death_year = mother[0].get_death_year()
     # if mother_death_year != -1:
-    #     print(mother_shortname + " passed away in " + str(mother_death_year) )
+    #     logging.info(mother_shortname + " passed away in " + str(mother_death_year) )
 
     return family_clips
 
@@ -262,7 +230,7 @@ if __name__ == "__main__":
 
     # descendants = get_descendants(starting_individual)
     # for descendant in descendants:
-    #     print(descendant.get_name())
+    #     logging.info(descendant.get_name())
 
     starting_families = get_family_from_individual(starting_individual)
     descendant_families = get_descendant_families(starting_families[0])
@@ -284,4 +252,4 @@ if __name__ == "__main__":
 
         final_video.write_videofile(video_final_path, fps=5)
     else:
-        print("No Clips Generated!")
+        logging.info("No Clips Generated!")
